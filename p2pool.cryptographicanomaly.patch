@@ -1,0 +1,116 @@
+diff --git a/p2pool/bitcoin/networks.py b/p2pool/bitcoin/networks.py
+index c604696..b6e3181 100644
+--- a/p2pool/bitcoin/networks.py
++++ b/p2pool/bitcoin/networks.py
+@@ -102,6 +102,49 @@ nets = dict(
+         DUST_THRESHOLD=1e8,
+     ),
+     
++	cryptographicanomaly=math.Object(
++        P2P_PREFIX='fbc0b6db'.decode('hex'),
++        P2P_PORT=13931,
++        ADDRESS_VERSION=23,
++        RPC_PORT=13932,
++        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
++            'cryptographicanomalyaddress' in (yield bitcoind.rpc_help()) and
++            not (yield bitcoind.rpc_getinfo())['testnet']
++        )),
++        SUBSIDY_FUNC=lambda height: 0*100000000,
++        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
++        BLOCK_PERIOD=40, # s
++        SYMBOL='CGA',
++        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Cryptographicanomaly') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Cryptographicanomaly/') if platform.system() == 'Darwin' else os.path.expanduser('~/.cryptographicanomaly'), 'cryptographicanomaly.conf'),
++        BLOCK_EXPLORER_URL_PREFIX='http://cryptexplorer.com/block/',
++        ADDRESS_EXPLORER_URL_PREFIX='http://cryptexplorer.com/address/',
++        TX_EXPLORER_URL_PREFIX='http://cryptexplorer.com/tx/',
++        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256//1000 - 1),
++        DUMB_SCRYPT_DIFF=2**16,
++        DUST_THRESHOLD=0
++    ),
++    cryptographicanomaly_testnet=math.Object(
++        P2P_PREFIX='fcc1b7dc'.decode('hex'),
++        P2P_PORT=6008,
++        ADDRESS_VERSION=125,
++        RPC_PORT=6009, #?
++        RPC_CHECK=defer.inlineCallbacks(lambda bitcoind: defer.returnValue(
++            'cryptographicanomalyaddress' in (yield bitcoind.rpc_help()) and
++            (yield bitcoind.rpc_getinfo())['testnet']
++        )),
++        SUBSIDY_FUNC=lambda height: 0*100000000,
++        POW_FUNC=lambda data: pack.IntType(256).unpack(__import__('ltc_scrypt').getPoWHash(data)),
++        BLOCK_PERIOD=40, # s
++        SYMBOL='tCGA',
++        CONF_FILE_FUNC=lambda: os.path.join(os.path.join(os.environ['APPDATA'], 'Cryptographicanomaly') if platform.system() == 'Windows' else os.path.expanduser('~/Library/Application Support/Cryptographicanomaly/') if platform.system() == 'Darwin' else os.path.expanduser('~/.cryptographicanomaly'), 'cryptographicanomaly.conf'),
++        BLOCK_EXPLORER_URL_PREFIX='http://nonexistent-cryptographicanomaly-testnet-explorer/block/',
++        ADDRESS_EXPLORER_URL_PREFIX='http://nonexistent-cryptographicanomaly-testnet-explorer/address/',
++        TX_EXPLORER_URL_PREFIX='http://nonexistent-cryptographicanomaly-testnet-explorer/tx/',
++        SANE_TARGET_RANGE=(2**256//1000000000 - 1, 2**256 - 1),
++        DUMB_SCRYPT_DIFF=2**16,
++        DUST_THRESHOLD=0
++    ),
++
+     litecoin=math.Object(
+         P2P_PREFIX='fbc0b6db'.decode('hex'),
+         P2P_PORT=9333,
+diff --git a/p2pool/bitcoin/p2p.py b/p2pool/bitcoin/p2p.py
+index d6f50c2..faae234 100644
+--- a/p2pool/bitcoin/p2p.py
++++ b/p2pool/bitcoin/p2p.py
+@@ -18,7 +18,7 @@ class Protocol(p2protocol.Protocol):
+     
+     def connectionMade(self):
+         self.send_version(
+-            version=70002,
++            version=70003,
+             services=1,
+             time=int(time.time()),
+             addr_to=dict(
+diff --git a/p2pool/networks.py b/p2pool/networks.py
+index 20cda88..56ca86f 100644
+--- a/p2pool/networks.py
++++ b/p2pool/networks.py
+@@ -45,6 +45,44 @@ nets = dict(
+         ANNOUNCE_CHANNEL='#p2pool-alt',
+         VERSION_CHECK=lambda v: 50700 <= v < 60000 or 60010 <= v < 60100 or 60400 <= v,
+     ),
++	
++	cryptographicanomaly=math.Object(
++        PARENT=networks.nets['cryptographicanomaly'],
++        SHARE_PERIOD=6, # seconds
++        CHAIN_LENGTH=24*60*60//10, # shares
++        REAL_CHAIN_LENGTH=24*60*60//10, # shares
++        TARGET_LOOKBEHIND=200, # shares
++        SPREAD=45, # blocks
++        IDENTIFIER='c0212b3a2a928a16'.decode('hex'),
++        PREFIX='6f6d6c13fcce7824'.decode('hex'),
++        P2P_PORT=23931,
++        MIN_TARGET=0,
++        MAX_TARGET=2**256//2**20 - 1,
++        PERSIST=False,
++        WORKER_PORT=23932,
++        BOOTSTRAP_ADDRS='cryptographicanomaly.p2p.0x0a.nl'.split(' '),
++        #ANNOUNCE_CHANNEL='#p2pool-cryptographicanomaly',
++        VERSION_CHECK=lambda v: 70003 <= v,
++        VERSION_WARNING=lambda v: 'Upgrade Cryptographicanomaly to >= 0.7.0.3!' if v < 70003 else None,
++    ),
++    cryptographicanomaly_testnet=math.Object(
++        PARENT=networks.nets['cryptographicanomaly_testnet'],
++        SHARE_PERIOD=6, # seconds
++        CHAIN_LENGTH=20*60//3, # shares
++        REAL_CHAIN_LENGTH=20*60//3, # shares
++        TARGET_LOOKBEHIND=200, # shares
++        SPREAD=45, # blocks
++        IDENTIFIER='abce87f1b8411861'.decode('hex'),
++        PREFIX='e141bc2258556787'.decode('hex'),
++        P2P_PORT=7009,
++        MIN_TARGET=2**256//50 - 1,
++        MAX_TARGET=2**256//50 - 1,
++        PERSIST=False,
++        WORKER_PORT=7008,
++        BOOTSTRAP_ADDRS=''.split(' '),
++        #ANNOUNCE_CHANNEL='#p2pool-cryptographicanomaly',
++        VERSION_CHECK=lambda v: True,
++    ),
+     
+     litecoin=math.Object(
+         PARENT=networks.nets['litecoin'],
